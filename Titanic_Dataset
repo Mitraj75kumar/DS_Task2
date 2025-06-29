@@ -1,0 +1,140 @@
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+import os
+
+# Set style for plots
+sns.set_style('whitegrid')
+plt.rcParams['figure.figsize'] = (10, 6)
+
+def load_titanic_data():
+    """Load Titanic dataset with multiple fallback options."""
+    possible_paths = [
+        r'C:\Users\mitra\Downloads\titanic.csv',
+        r'C:\Users\mitra\Desktop\titanic.csv',
+        'titanic.csv',
+        'data/titanic.csv',
+        '../data/titanic.csv'
+    ]
+    
+    for file_path in possible_paths:
+        try:
+            if os.path.exists(file_path):
+                print(f"Loading data from: {file_path}")
+                df = pd.read_csv(file_path)
+                print(f"Success! Loaded {len(df)} records.")
+                return df
+            else:
+                print(f"File not found at: {file_path}")
+        except Exception as e:
+            print(f"Error loading {file_path}: {str(e)}")
+    
+    # Fallback to sample data
+    print("\nWarning: Could not load Titanic data from any location")
+    print("Creating sample DataFrame for demonstration purposes...")
+    return pd.DataFrame({
+        'PassengerId': [1, 2, 3],
+        'Survived': [0, 1, 1],
+        'Pclass': [3, 1, 2],
+        'Name': ['John Doe', 'Jane Smith', 'Bob Johnson'],
+        'Sex': ['male', 'female', 'male'],
+        'Age': [22, 38, 26],
+        'SibSp': [1, 0, 0],
+        'Parch': [0, 0, 0],
+        'Ticket': ['A/5 21171', 'PC 17599', 'STON/O2. 3101282'],
+        'Fare': [7.25, 71.28, 10.50],
+        'Cabin': [None, 'C85', None],
+        'Embarked': ['S', 'C', 'S']
+    })
+
+# Load the data
+titanic = load_titanic_data()
+
+# Basic Data Exploration
+print("\n=== Dataset Info ===")
+print(titanic.info())
+
+print("\n=== Summary Statistics ===")
+print(titanic.describe(include='all'))
+
+print("\n=== Missing Values ===")
+print(titanic.isnull().sum())
+
+# Data Cleaning
+def clean_titanic_data(df):
+    """Clean the Titanic dataset."""
+    # Handle missing values
+    df['Age'] = df['Age'].fillna(df['Age'].median())
+    df['Embarked'] = df['Embarked'].fillna(df['Embarked'].mode()[0])
+    df['Cabin'] = df['Cabin'].fillna('Unknown')
+    
+    # Create new features
+    df['FamilySize'] = df['SibSp'] + df['Parch'] + 1
+    df['IsAlone'] = (df['FamilySize'] == 1).astype(int)
+    df['Title'] = df['Name'].str.extract(' ([A-Za-z]+)\.', expand=False)
+    df['Title'] = df['Title'].replace(['Lady', 'Countess','Capt', 'Col','Don', 
+                                       'Dr', 'Major', 'Rev', 'Sir', 'Jonkheer', 'Dona'], 'Rare')
+    df['Title'] = df['Title'].replace('Mlle', 'Miss')
+    df['Title'] = df['Title'].replace('Ms', 'Miss')
+    df['Title'] = df['Title'].replace('Mme', 'Mrs')
+    
+    # Drop unnecessary columns
+    df = df.drop(['PassengerId', 'Name', 'Ticket', 'Cabin'], axis=1)
+    
+    return df
+
+titanic_clean = clean_titanic_data(titanic)
+
+# Visualization
+def plot_survival_distributions(df):
+    """Plot distributions of key features against survival."""
+    fig, axes = plt.subplots(2, 3, figsize=(18, 12))
+    
+    # Pclass
+    sns.countplot(x='Pclass', hue='Survived', data=df, ax=axes[0, 0])
+    axes[0, 0].set_title('Survival by Passenger Class')
+    
+    # Sex
+    sns.countplot(x='Sex', hue='Survived', data=df, ax=axes[0, 1])
+    axes[0, 1].set_title('Survival by Gender')
+    
+    # Age
+    sns.histplot(data=df, x='Age', hue='Survived', bins=30, kde=True, ax=axes[0, 2])
+    axes[0, 2].set_title('Survival by Age')
+    
+    # Fare
+    sns.histplot(data=df, x='Fare', hue='Survived', bins=30, kde=True, ax=axes[1, 0])
+    axes[1, 0].set_title('Survival by Fare')
+    
+    # Embarked
+    sns.countplot(x='Embarked', hue='Survived', data=df, ax=axes[1, 1])
+    axes[1, 1].set_title('Survival by Port of Embarkation')
+    
+    # Family Size
+    sns.countplot(x='FamilySize', hue='Survived', data=df, ax=axes[1, 2])
+    axes[1, 2].set_title('Survival by Family Size')
+    
+    plt.tight_layout()
+    plt.show()
+
+plot_survival_distributions(titanic_clean)
+
+# Correlation Analysis
+plt.figure(figsize=(10, 8))
+sns.heatmap(titanic_clean.corr(numeric_only=True), annot=True, cmap='coolwarm', center=0)
+plt.title('Feature Correlation Matrix')
+plt.show()
+
+# Save cleaned data
+output_dir = os.getcwd()
+output_path = os.path.join(output_dir, 'titanic_cleaned.csv')
+
+try:
+    titanic_clean.to_csv(output_path, index=False)
+    print(f"\nSuccessfully saved cleaned data to: {output_path}")
+except Exception as e:
+    print(f"\nCould not save output file: {str(e)}")
+    print("You may need to specify a different output directory with write permissions")
+
+print("\n=== Analysis Complete ===")
